@@ -12,7 +12,6 @@ using Microsoft.ApplicationInsights.Extensibility.Implementation;
 using Microsoft.ApplicationInsights.WindowsServer.TelemetryChannel;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.Host.Executors;
-using Microsoft.Azure.WebJobs.Host.Scale;
 using Microsoft.Azure.WebJobs.Hosting;
 using Microsoft.Azure.WebJobs.Logging;
 using Microsoft.Azure.WebJobs.Logging.ApplicationInsights;
@@ -26,6 +25,7 @@ using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Azure.WebJobs.Script.Eventing;
 using Microsoft.Azure.WebJobs.Script.Extensibility;
 using Microsoft.Azure.WebJobs.Script.ExtensionBundle;
+using Microsoft.Azure.WebJobs.Script.Extensions;
 using Microsoft.Azure.WebJobs.Script.FileProvisioning;
 using Microsoft.Azure.WebJobs.Script.Http;
 using Microsoft.Azure.WebJobs.Script.ManagedDependencies;
@@ -78,7 +78,7 @@ namespace Microsoft.Azure.WebJobs.Script
                                                  IMetricsLogger metricsLogger,
                                                  Action<IWebJobsBuilder> configureWebJobs = null)
         {
-            loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
+            loggerFactory ??= NullLoggerFactory.Instance;
 
             builder.SetAzureFunctionsConfigurationRoot();
             // Host configuration
@@ -86,7 +86,7 @@ namespace Microsoft.Azure.WebJobs.Script
             {
                 loggingBuilder.AddDefaultWebJobsFilters();
 
-                string loggingPath = ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, "Logging");
+                string loggingPath = ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging);
                 loggingBuilder.AddConfiguration(context.Configuration.GetSection(loggingPath));
 
                 loggingBuilder.Services.AddSingleton<IFileWriterFactory, DefaultFileWriterFactory>();
@@ -95,13 +95,18 @@ namespace Microsoft.Azure.WebJobs.Script
 
                 loggingBuilder.AddConsoleIfEnabled(context);
 
-                ConfigureApplicationInsights(context, loggingBuilder);
+                loggingBuilder.ConfigureOpenTelemetry(context, out bool appInsightsOtelConfigured);
+                if (!appInsightsOtelConfigured)
+                {
+                    ConfigureApplicationInsights(context, loggingBuilder);
+                }
             })
             .ConfigureAppConfiguration((context, configBuilder) =>
             {
                 if (!context.Properties.ContainsKey(ScriptConstants.SkipHostJsonConfigurationKey))
                 {
                     configBuilder.Add(new HostJsonFileConfigurationSource(applicationOptions, SystemEnvironment.Instance, loggerFactory, metricsLogger));
+                    configBuilder.AddOpenTelemetryConfigurations(context);
                 }
                 // Adding hosting config into job host configuration
                 configBuilder.Add(new FunctionsHostingConfigSource(SystemEnvironment.Instance));

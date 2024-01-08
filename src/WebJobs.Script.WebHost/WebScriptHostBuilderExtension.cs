@@ -29,10 +29,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OpenTelemetry.Logs;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 
 namespace Microsoft.Azure.WebJobs.Script.WebHost
 {
@@ -45,12 +41,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             IDependencyValidator validator = rootServiceProvider.GetService<IDependencyValidator>();
             IMetricsLogger metricsLogger = rootServiceProvider.GetService<IMetricsLogger>();
             IEnvironment environment = rootServiceProvider.GetService<IEnvironment>();
-            Action<ResourceBuilder> configureResource = r => r.AddService(
-                        serviceName: "Azure.Functions.Service",
-                        serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown",
-                        serviceInstanceId: Environment.MachineName);
 
-            OpenTelemetryEventListener openTelemetryEventListener = new OpenTelemetryEventListener(EventLevel.Verbose);
             builder.UseServiceProviderFactory(new JobHostScopedServiceProviderFactory(rootServiceProvider, rootServices, validator))
                 .ConfigureServices(services =>
                 {
@@ -92,10 +83,12 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                 {
                     ConfigureRegisteredBuilders(configurationBuilder, rootServiceProvider);
                 })
-                .ConfigureLogging(loggingBuilder =>
+                .ConfigureLogging((hostContext, loggingBuilder) =>
                 {
+                    loggingBuilder.Services.AddSingleton(new OpenTelemetryEventListener(string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OPENTELEMETRY_EVENT_LEVEL")) ? EventLevel.Warning : Enum.Parse<EventLevel>(Environment.GetEnvironmentVariable("OPENTELEMETRY_EVENT_LEVEL"))));
+
                     loggingBuilder.Services.AddSingleton<ILoggerFactory, ScriptLoggerFactory>();
-                    loggingBuilder.Services.AddSingleton<ILoggerProvider, MeterLoggerProvider>();
+                    //loggingBuilder.Services.AddSingleton<ILoggerProvider, MeterLoggerProvider>();
 
                     loggingBuilder.AddWebJobsSystem<SystemLoggerProvider>();
                     if (environment.IsAzureMonitorEnabled())
@@ -110,24 +103,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                     }
 
                     ConfigureRegisteredBuilders(loggingBuilder, rootServiceProvider);
-                    loggingBuilder.AddOpenTelemetry(options =>
-                    {
-                        // Note: See appsettings.json Logging:OpenTelemetry section for configuration.
-
-                        var resourceBuilder = ResourceBuilder.CreateDefault();
-                        configureResource(resourceBuilder);
-                        options.SetResourceBuilder(resourceBuilder);
-                        options.AddOtlpExporter(o =>
-                        {
-                            o.Endpoint = new Uri("<>");
-                            o.Headers = "<>";
-                        });
-                        options.AddConsoleExporter();
-                        options.AddAzureMonitorLogExporter(o =>
-                        {
-                            o.ConnectionString = "<>";
-                        });
-                    });
                 })
                 .ConfigureServices(services =>
                 {
@@ -173,37 +148,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                     }
 
                     services.AddSingleton<IDelegatingHandlerProvider, DefaultDelegatingHandlerProvider>();
-
-                    services.AddOpenTelemetry()
-                    .ConfigureResource(configureResource)
-                    .WithMetrics(builder =>
-                    {
-                        builder.AddMeter("Azure.Functions");
-                        //builder.AddConsoleExporter();
-                        builder.AddAzureMonitorMetricExporter(o =>
-                        {
-                            o.ConnectionString = "<>";
-                        });
-                        builder.AddOtlpExporter(o =>
-                        {
-                            o.Endpoint = new Uri("<>");
-                            o.Headers = "<>";
-                        });
-                    })
-                    .WithTracing(builder =>
-                    {
-                        builder.AddAspNetCoreInstrumentation();
-                        //builder.AddConsoleExporter();
-                        builder.AddAzureMonitorTraceExporter(o =>
-                        {
-                            o.ConnectionString = "<>";
-                        });
-                        builder.AddOtlpExporter(o =>
-                        {
-                            o.Endpoint = new Uri("<>");
-                            o.Headers = "<>";
-                        });
-                    });
 
                     // Logging and diagnostics
                     services.AddSingleton<IMetricsLogger>(a => new NonDisposableMetricsLogger(metricsLogger));
