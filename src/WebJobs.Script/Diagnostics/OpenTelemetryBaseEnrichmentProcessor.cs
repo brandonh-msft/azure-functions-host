@@ -18,10 +18,14 @@ namespace Microsoft.Azure.WebJobs.Script.Diagnostics
         protected abstract void AddHostInstanceId(T data, string hostInstanceId);
         protected abstract void AddProcessId(T data);
 
+        protected virtual void OnEndInternal(T data) { }
+
         sealed public override void OnEnd(T data)
         {
             AddHostInstanceId(data, _hostOptions.InstanceId);
             AddProcessId(data);
+
+            OnEndInternal(data);
 
             base.OnEnd(data);
         }

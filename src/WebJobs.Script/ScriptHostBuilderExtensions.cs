@@ -423,7 +423,7 @@ namespace Microsoft.Azure.WebJobs.Script
                     {
                         otelHostJsonConfigSection.Bind(o);
                         // Add enrichment to all logs
-                        o.AddProcessor(sp => new OpenTelemetryLogEnrichmentProcessor(sp.GetRequiredService<IOptions<ScriptJobHostOptions>>()));
+                        o.AddProcessor(sp2 => new OpenTelemetryLogEnrichmentProcessor(sp2.GetRequiredService<IOptions<ScriptJobHostOptions>>(), sp2.GetService<IConfigureOptions<ApplicationInsightsLoggerOptions>>()));
                     }).Services.AddOpenTelemetry()
                     .AddAzureMonitorDistro(otelHostJsonConfigSection.GetSection("azureMonitor"))
                     .AddConsoleExporter(otelHostJsonConfigSection.GetSection("console"), loggingBuilder)
