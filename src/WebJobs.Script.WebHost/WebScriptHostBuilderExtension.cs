@@ -85,7 +85,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                 {
                     if (hostContext.HostingEnvironment.IsDevelopment())
                     {
-                        loggingBuilder.Services.AddSingleton(new OpenTelemetryEventListener(System.Diagnostics.Tracing.EventLevel.Verbose));
+                        //loggingBuilder.Services.AddSingleton(new OpenTelemetryEventListener(System.Diagnostics.Tracing.EventLevel.Verbose));
                     }
 
                     loggingBuilder.Services.AddSingleton<ILoggerFactory, ScriptLoggerFactory>();

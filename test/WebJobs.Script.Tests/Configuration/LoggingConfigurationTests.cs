@@ -1,8 +1,6 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Azure.WebJobs.Logging.ApplicationInsights;
 using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.Diagnostics;
@@ -14,6 +12,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
 using Microsoft.WebJobs.Script.Tests;
+using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 
 namespace Microsoft.Azure.WebJobs.Script.Tests.Configuration
@@ -213,6 +213,32 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Configuration
                 loggerProviders.OfType<FunctionFileLoggerProvider>().Single();
                 loggerProviders.OfType<ConsoleLoggerProvider>().Single();
                 loggerProviders.OfType<AzureMonitorDiagnosticLoggerProvider>().Single();
+            }
+        }
+
+        [Fact]
+        public void LoggerProviders_ConsoleDisabled_InConfiguration()
+        {
+            var hostBuilder = new HostBuilder()
+                 .ConfigureAppConfiguration(c =>
+                 {
+                     c.AddInMemoryCollection(new Dictionary<string, string>
+                    {
+                        { ConfigurationPath.Combine(_loggingPath, "Console", "IsEnabled"), "False" }
+                    });
+                 })
+                .ConfigureDefaultTestWebScriptHost();
+
+            using (IHost host = hostBuilder.Build())
+            {
+                IEnumerable<ILoggerProvider> loggerProviders = host.Services.GetService<IEnumerable<ILoggerProvider>>();
+
+                Assert.Equal(5, loggerProviders.Count());
+                loggerProviders.OfType<SystemLoggerProvider>().Single();
+                loggerProviders.OfType<HostFileLoggerProvider>().Single();
+                loggerProviders.OfType<FunctionFileLoggerProvider>().Single();
+                loggerProviders.OfType<AzureMonitorDiagnosticLoggerProvider>().Single();
+                Assert.False(loggerProviders.OfType<ConsoleLoggerProvider>().Any());
             }
         }
 

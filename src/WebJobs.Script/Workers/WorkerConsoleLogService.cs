@@ -1,12 +1,14 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Console;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Azure.WebJobs.Script.Workers
 {
@@ -18,16 +20,9 @@ namespace Microsoft.Azure.WebJobs.Script.Workers
         private Task _processingTask;
         private bool _disposed = false;
 
-        public WorkerConsoleLogService(ILoggerFactory loggerFactory, IWorkerConsoleLogSource consoleLogSource)
-        {
-            if (loggerFactory == null)
-            {
-                throw new ArgumentNullException(nameof(loggerFactory));
-            }
+        public WorkerConsoleLogService(IWorkerConsoleLogSource consoleLogSource) : this(new NullLogger<WorkerConsoleLogService>(), consoleLogSource) { }
 
-            _source = consoleLogSource ?? throw new ArgumentNullException(nameof(consoleLogSource));
-            _logger = loggerFactory.CreateLogger(WorkerConstants.ConsoleLogCategoryName);
-        }
+        public WorkerConsoleLogService(ConsoleLoggerProvider consoleProvider, IWorkerConsoleLogSource consoleLogSource) : this(consoleProvider?.CreateLogger(WorkerConstants.ConsoleLogCategoryName) ?? new NullLogger<WorkerConsoleLogService>(), consoleLogSource) { }
 
         internal WorkerConsoleLogService(ILogger logger, IWorkerConsoleLogSource consoleLogSource)
         {
