@@ -48,6 +48,7 @@ using OpenTelemetry.Trace;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace Microsoft.Azure.WebJobs.Script
@@ -501,6 +502,18 @@ namespace Microsoft.Azure.WebJobs.Script
 
         internal static void ConfigureApplicationInsights(HostBuilderContext context, ILoggingBuilder builder)
         {
+            // We don't want to do this if the user has already configured Azure Monitor w/in Otel; prefer Otel over AppInsights SDK
+            // Since the registered types could vary between instances, IOptions<T>, or IConfiguredOptions<T>, etc. just pivot
+            // on the type string
+            if (builder.Services.Any(i =>
+            {
+                var typeString = i.ServiceType.ToString();
+                return typeString.Contains("AzureMonitorTraceExporter") || typeString.Contains("AzureMonitorExporterOptions");
+            }))
+            {
+                return;
+            }
+
             string appInsightsInstrumentationKey = context.Configuration[EnvironmentSettingNames.AppInsightsInstrumentationKey];
             string appInsightsConnectionString = context.Configuration[EnvironmentSettingNames.AppInsightsConnectionString];
 

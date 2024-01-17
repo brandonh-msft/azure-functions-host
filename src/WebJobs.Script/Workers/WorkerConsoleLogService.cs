@@ -24,6 +24,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers
 
         public WorkerConsoleLogService(ConsoleLoggerProvider consoleProvider, IWorkerConsoleLogSource consoleLogSource) : this(consoleProvider?.CreateLogger(WorkerConstants.ConsoleLogCategoryName) ?? new NullLogger<WorkerConsoleLogService>(), consoleLogSource) { }
 
+        public WorkerConsoleLogService(ILoggerFactory loggerFactory, IWorkerConsoleLogSource consoleLogSource) : this(loggerFactory?.CreateLogger(WorkerConstants.ConsoleLogCategoryName) ?? new NullLogger<WorkerConsoleLogService>(), consoleLogSource) { }
+
         internal WorkerConsoleLogService(ILogger logger, IWorkerConsoleLogSource consoleLogSource)
         {
             _source = consoleLogSource ?? throw new ArgumentNullException(nameof(consoleLogSource));
