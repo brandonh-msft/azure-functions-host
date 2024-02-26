@@ -16,6 +16,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 
 namespace Microsoft.Azure.WebJobs.Script.Extensions
 {
@@ -66,7 +67,7 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
                 // These are messages piped back to the host from the worker - we don't handle these anymore.
                 // Instead, we expect the user's own code to be logging these where they want them to go.
                 .AddFilter("Host.Function.Console", LogLevel.None)
-                .AddFilter("Function.*.User", LogLevel.None);
+                .AddFilter("Function.*", LogLevel.None);
 
             // Configure opentelemetry exporters from host.config / opentelemetry / exporters across all 3 avenues
             var exporterConfig = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.OpenTelemetry, OpenTelemetryConfigurationSectionNames.Exporters));
@@ -163,7 +164,7 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
                     FlagSwitch(type, new (ExporterType, Action)[] {
                         (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(b => b.AddGenevaLogExporter(section.OtelBind))),
                         (ExporterType.Metrics, () => otBuilder.WithMetrics(b => b.AddGenevaMetricExporter(section.OtelBind))),
-                        (ExporterType.Logging, () => otBuilder.WithTracing(b => b.AddGenevaTraceExporter(section.OtelBind)))
+                        (ExporterType.Traces, () => otBuilder.WithTracing(b => b.AddGenevaTraceExporter(section.OtelBind)))
                     });
                 }
                 else if (section.Key.Equals(OpenTelemetryConfigurationSectionNames.ConstantExporter, StringComparison.OrdinalIgnoreCase))
@@ -171,7 +172,7 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
                     FlagSwitch(type, new (ExporterType, Action)[] {
                         (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(b => b.AddConsoleExporter(section.OtelBind))),
                         (ExporterType.Metrics, () => otBuilder.WithMetrics(b => b.AddConsoleExporter(section.OtelBind))),
-                        (ExporterType.Logging, () => otBuilder.WithTracing(b => b.AddConsoleExporter(section.OtelBind)))
+                        (ExporterType.Traces, () => otBuilder.WithTracing(b => b.AddConsoleExporter(section.OtelBind)))
                     });
                 }
                 else
@@ -184,7 +185,7 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
         private static void FlagSwitch<T>(T value, IEnumerable<(T Value, Action Action)> actions) where T : Enum
         {
             // Check if the enum has the Flags attribute
-            _ = Attribute.GetCustomAttribute(typeof(T), typeof(FlagsAttribute)) ?? throw new ArgumentException("The provided enum does not have the [Flags] attribute.");
+            _ = typeof(T).GetCustomAttribute<FlagsAttribute>() ?? throw new ArgumentException($@"The provided enum '{typeof(T).FullName}' does not have the [Flags] attribute.");
 
             foreach (var a in actions)
             {
