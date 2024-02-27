@@ -50,15 +50,14 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             // It follows the schema used by OpenTelemetry.NET's support for IOptions
             // See https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/docs/trace/customizing-the-sdk/README.md#configuration-files-and-environment-variables
 
-            if (!context.Configuration.HasOpenTelemetryDefined())
+            if (bool.TryParse(Environment.GetEnvironmentVariable(EnvironmentSettingNames.OtelSdkDisabled) ?? bool.TrueString, out var b) && b)
             {
                 return;
             }
 
             var services = loggingBuilder.Services;
             OpenTelemetryBuilder otBuilder = services.AddOpenTelemetry()
-                .WithTracing(c => c.AddProcessor(OtelActivitySanitizingProcessor.Instance))
-                .ConfigureResource(rb => ConfigureOpenTelemetryResourceBuilder(context, rb));
+                .WithTracing(c => c.AddProcessor(OtelActivitySanitizingProcessor.Instance));
 
             var specificOtelConfig = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, OpenTelemetryConfigurationSectionNames.OpenTelemetry));
             if (specificOtelConfig.Exists())
@@ -104,6 +103,9 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             {
                 RegisterExporter(otBuilder, section, ExporterType.Traces);
             }
+
+            otBuilder
+                .ConfigureResource(rb => ConfigureOpenTelemetryResourceBuilder(context, rb));
         }
 
         [Flags]
@@ -117,17 +119,6 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
         private static void OtelBind<T>(this IConfigurationSection section, T options) => section.Bind(options, bo => bo.BindNonPublicProperties = true);
 
         private static readonly ImmutableArray<string> WellKnownOpenTelemetryExporters = ImmutableArray.Create(OpenTelemetryConfigurationSectionNames.ConstantExporter, OpenTelemetryConfigurationSectionNames.GenevaExporter, OpenTelemetryConfigurationSectionNames.AzureMonitorExporter);
-
-        private static bool HasOpenTelemetryDefined(this IConfiguration config)
-        {
-            var hasOtelDisabledEnvVarFalse = bool.TryParse(Environment.GetEnvironmentVariable(EnvironmentSettingNames.OtelSdkDisabled) ?? bool.TrueString, out var b) && !b;
-            var hasGlobalOtelDefined = () => config.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.OpenTelemetry)).Exists();
-            var hasOtelLoggingConfigured = () => config.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, OpenTelemetryConfigurationSectionNames.OpenTelemetry)).Exists();
-            var hassOtelMetricsConfigured = () => config.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.Metrics, OpenTelemetryConfigurationSectionNames.OpenTelemetry)).Exists();
-            var hasOtelTracesConfigured = () => config.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.Traces, OpenTelemetryConfigurationSectionNames.OpenTelemetry)).Exists();
-
-            return hasOtelDisabledEnvVarFalse || hasGlobalOtelDefined() || hasOtelLoggingConfigured() || hasOtelTracesConfigured() || hassOtelMetricsConfigured();
-        }
 
         private static void RegisterExporter(OpenTelemetryBuilder otBuilder, IConfigurationSection section, ExporterType type)
         {
