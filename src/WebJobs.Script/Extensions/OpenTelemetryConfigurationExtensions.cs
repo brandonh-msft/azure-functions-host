@@ -120,11 +120,10 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             {
                 if (!WellKnownOpenTelemetryExporters.Contains(section.Key, StringComparer.OrdinalIgnoreCase))
                 {
-                    FlagSwitch(type, new (ExporterType, Action)[] {
+                    type.RunMatch(
                         (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(o => o.AddOtlpExporter(section.Key, section.Bind))),
                         (ExporterType.Metrics, () => otBuilder.WithMetrics(o => o.AddOtlpExporter(section.Key, section.Bind))),
-                        (ExporterType.Traces, () => otBuilder.WithTracing(o => o.AddOtlpExporter(section.Key, section.Bind)))
-                    });
+                        (ExporterType.Traces, () => otBuilder.WithTracing(o => o.AddOtlpExporter(section.Key, section.Bind))));
                 }
                 else
                 {
@@ -141,19 +140,17 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
                     }
                     else if (section.Key.Equals(OpenTelemetryConfigurationSectionNames.GenevaExporter, StringComparison.OrdinalIgnoreCase))
                     {
-                        FlagSwitch(type, new (ExporterType, Action)[] {
+                        type.RunMatch(
                             (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(b => b.AddGenevaLogExporter(section.OtelBind))),
                             (ExporterType.Metrics, () => otBuilder.WithMetrics(b => b.AddGenevaMetricExporter(section.OtelBind))),
-                            (ExporterType.Traces, () => otBuilder.WithTracing(b => b.AddGenevaTraceExporter(section.OtelBind)))
-                        });
+                            (ExporterType.Traces, () => otBuilder.WithTracing(b => b.AddGenevaTraceExporter(section.OtelBind))));
                     }
                     else if (section.Key.Equals(OpenTelemetryConfigurationSectionNames.ConstantExporter, StringComparison.OrdinalIgnoreCase))
                     {
-                        FlagSwitch(type, new (ExporterType, Action)[] {
+                        type.RunMatch(
                             (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(b => b.AddConsoleExporter(section.OtelBind))),
                             (ExporterType.Metrics, () => otBuilder.WithMetrics(b => b.AddConsoleExporter(section.OtelBind))),
-                            (ExporterType.Traces, () => otBuilder.WithTracing(b => b.AddConsoleExporter(section.OtelBind)))
-                        });
+                            (ExporterType.Traces, () => otBuilder.WithTracing(b => b.AddConsoleExporter(section.OtelBind))));
                     }
                     else
                     {
@@ -163,18 +160,38 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             }
         }
 
-        private static void FlagSwitch<T>(T value, IEnumerable<(T Value, Action Action)> actions) where T : Enum
+        private static void RunMatch<T>(this T value, params (T Value, Action Action)[] actions) where T : Enum
         {
             // Check if the enum has the Flags attribute
-            _ = typeof(T).GetCustomAttribute<FlagsAttribute>() ?? throw new ArgumentException($@"The provided enum '{typeof(T).FullName}' does not have the [Flags] attribute.");
+            _ = typeof(T).GetCustomAttribute<FlagsAttribute>() ?? throw new ArgumentException($"The provided enum '{typeof(T).FullName}' does not have the [Flags] attribute.");
 
             foreach (var a in actions)
             {
+                if (IsCompositeFlagValue(a.Value))
+                {
+                    throw new ArgumentException($@"The value for an action has a composite flag value '{a.Value}' which is not supported.");
+                }
+
                 if (value.HasFlag(a.Value))
                 {
                     a.Action();
                 }
             }
+        }
+
+        private static bool IsCompositeFlagValue<T>(T value) where T : Enum
+        {
+            var underlyingType = Enum.GetUnderlyingType(typeof(T));
+            if (underlyingType == typeof(byte) || underlyingType == typeof(sbyte) ||
+                underlyingType == typeof(short) || underlyingType == typeof(ushort) ||
+                underlyingType == typeof(int) || underlyingType == typeof(uint) ||
+                underlyingType == typeof(long) || underlyingType == typeof(ulong))
+            {
+                var numericValue = Convert.ToUInt64(value);
+                return (numericValue & (numericValue - 1)) != 0;
+            }
+
+            return false;
         }
 
         private static void ConfigureOpenTelemetryResourceBuilder(HostBuilderContext context, ResourceBuilder r)
