@@ -120,12 +120,13 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
 
         private static bool HasOpenTelemetryDefined(this IConfiguration config)
         {
-            var hasGlobalOtelDefined = config.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.OpenTelemetry)).Exists();
-            var hasOtelLoggingConfigured = config.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, OpenTelemetryConfigurationSectionNames.OpenTelemetry)).Exists();
-            var hassOtelMetricsConfigured = config.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.Metrics, OpenTelemetryConfigurationSectionNames.OpenTelemetry)).Exists();
-            var hasOtelTracesConfigured = config.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.Traces, OpenTelemetryConfigurationSectionNames.OpenTelemetry)).Exists();
+            var hasOtelDisabledEnvVarFalse = bool.TryParse(Environment.GetEnvironmentVariable(EnvironmentSettingNames.OtelSdkDisabled) ?? bool.TrueString, out var b) && !b;
+            var hasGlobalOtelDefined = () => config.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.OpenTelemetry)).Exists();
+            var hasOtelLoggingConfigured = () => config.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, OpenTelemetryConfigurationSectionNames.OpenTelemetry)).Exists();
+            var hassOtelMetricsConfigured = () => config.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.Metrics, OpenTelemetryConfigurationSectionNames.OpenTelemetry)).Exists();
+            var hasOtelTracesConfigured = () => config.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.Traces, OpenTelemetryConfigurationSectionNames.OpenTelemetry)).Exists();
 
-            return hasGlobalOtelDefined || hasOtelLoggingConfigured || hasOtelTracesConfigured || hassOtelMetricsConfigured;
+            return hasOtelDisabledEnvVarFalse || hasGlobalOtelDefined() || hasOtelLoggingConfigured() || hasOtelTracesConfigured() || hassOtelMetricsConfigured();
         }
 
         private static void RegisterExporter(OpenTelemetryBuilder otBuilder, IConfigurationSection section, ExporterType type)
@@ -156,7 +157,7 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
                     otBuilder.UseAzureMonitor(section.OtelBind);
 
                     // Facilitate worker's use of ApplicationInsights
-                    Environment.SetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING", section["ConnectionString"]);
+                    Environment.SetEnvironmentVariable(EnvironmentSettingNames.AppInsightsConnectionString, section["ConnectionString"]);
 
                     // Ignore azureMonitor at the traces/metrics level because 'Distro' only supports one definition; we've chosen to use the 'logging'
                 }
