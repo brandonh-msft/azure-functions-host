@@ -73,39 +73,26 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
 
             // Configure opentelemetry exporters from host.config / opentelemetry / exporters across all 3 avenues
             var exporterConfig = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.OpenTelemetry, OpenTelemetryConfigurationSectionNames.Exporters));
-            foreach (var section in exporterConfig.GetChildren())
-            {
-                RegisterExporter(loggingBuilder, otBuilder, section,
-                    ExporterType.Logging | ExporterType.Traces | ExporterType.Metrics,
-                    ref appInsightsConfigured);
-            }
+            RegisterExporters(loggingBuilder, otBuilder, exporterConfig.GetChildren(),
+                ExporterType.Logging | ExporterType.Traces | ExporterType.Metrics,
+                ref appInsightsConfigured);
 
             // If the user configured exporters outside global (/opentelemetry/exporters) config, apply those now
             // If they have the same name, they'll be overridden by these registrations, as intended
 
             // Configure Otel Logging based on host.config / logging / openTelemetry
             specificOtelConfig = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, OpenTelemetryConfigurationSectionNames.OpenTelemetry, OpenTelemetryConfigurationSectionNames.Exporters));
-            foreach (var section in specificOtelConfig.GetChildren())
-            {
-                RegisterExporter(loggingBuilder, otBuilder, section, ExporterType.Logging, ref appInsightsConfigured);
-            }
+            RegisterExporters(loggingBuilder, otBuilder, specificOtelConfig.GetChildren(), ExporterType.Logging, ref appInsightsConfigured);
 
-            // Configure Otel Logging based on host.config / metrics / openTelemetry
+            // Configure Otel Metrics based on host.config / metrics / openTelemetry
             specificOtelConfig = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.Metrics, OpenTelemetryConfigurationSectionNames.OpenTelemetry, OpenTelemetryConfigurationSectionNames.Exporters));
-            foreach (var section in specificOtelConfig.GetChildren())
-            {
-                RegisterExporter(otBuilder, section, ExporterType.Metrics);
-            }
+            RegisterExporters(otBuilder, specificOtelConfig.GetChildren(), ExporterType.Metrics);
 
-            // Configure Otel Logging based on host.config / traces / openTelemetry
+            // Configure Otel Traces based on host.config / traces / openTelemetry
             specificOtelConfig = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.Traces, OpenTelemetryConfigurationSectionNames.OpenTelemetry, OpenTelemetryConfigurationSectionNames.Exporters));
-            foreach (var section in specificOtelConfig.GetChildren())
-            {
-                RegisterExporter(otBuilder, section, ExporterType.Traces);
-            }
+            RegisterExporters(otBuilder, specificOtelConfig.GetChildren(), ExporterType.Traces);
 
-            otBuilder
-                .ConfigureResource(rb => ConfigureOpenTelemetryResourceBuilder(context, rb));
+            otBuilder.ConfigureResource(rb => ConfigureOpenTelemetryResourceBuilder(context, rb));
         }
 
         [Flags]
@@ -120,57 +107,61 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
 
         private static readonly ImmutableArray<string> WellKnownOpenTelemetryExporters = ImmutableArray.Create(OpenTelemetryConfigurationSectionNames.ConstantExporter, OpenTelemetryConfigurationSectionNames.GenevaExporter, OpenTelemetryConfigurationSectionNames.AzureMonitorExporter);
 
-        private static void RegisterExporter(OpenTelemetryBuilder otBuilder, IConfigurationSection section, ExporterType type)
+        private static void RegisterExporters(OpenTelemetryBuilder otBuilder, IEnumerable<IConfigurationSection> sections, ExporterType type)
         {
             bool throwaway = false;
-            RegisterExporter(null, otBuilder, section, type, ref throwaway);
+
+            RegisterExporters(null, otBuilder, sections, type, ref throwaway);
         }
 
-        private static void RegisterExporter(ILoggingBuilder loggingBuilder, OpenTelemetryBuilder otBuilder, IConfigurationSection section, ExporterType type, ref bool appInsightsConfigured)
+        private static void RegisterExporters(ILoggingBuilder loggingBuilder, OpenTelemetryBuilder otBuilder, IEnumerable<IConfigurationSection> sections, ExporterType type, ref bool appInsightsConfigured)
         {
-            if (!WellKnownOpenTelemetryExporters.Contains(section.Key, StringComparer.OrdinalIgnoreCase))
+            foreach (var section in sections)
             {
-                FlagSwitch(type, new (ExporterType, Action)[] {
+                if (!WellKnownOpenTelemetryExporters.Contains(section.Key, StringComparer.OrdinalIgnoreCase))
+                {
+                    FlagSwitch(type, new (ExporterType, Action)[] {
                     (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(o => o.AddOtlpExporter(section.Key, section.Bind))),
                     (ExporterType.Metrics, () => otBuilder.WithMetrics(o => o.AddOtlpExporter(section.Key, section.Bind))),
                     (ExporterType.Traces, () => otBuilder.WithTracing(o => o.AddOtlpExporter(section.Key, section.Bind)))
                 });
-            }
-            else
-            {
-                // If AzureMonitor configuration is set, we have to wire that up a special way
-                if (section.Key.Equals(OpenTelemetryConfigurationSectionNames.AzureMonitorExporter, StringComparison.OrdinalIgnoreCase))
-                {
-                    Debug.Assert(type.HasFlag(ExporterType.Logging), "Azure Monitor sections should be labeled as logging exporter type");
-
-                    appInsightsConfigured = true;
-
-                    otBuilder.UseAzureMonitor(section.OtelBind);
-
-                    // Facilitate worker's use of ApplicationInsights
-                    Environment.SetEnvironmentVariable(EnvironmentSettingNames.AppInsightsConnectionString, section["ConnectionString"]);
-
-                    // Ignore azureMonitor at the traces/metrics level because 'Distro' only supports one definition; we've chosen to use the 'logging'
                 }
-                else if (section.Key.Equals(OpenTelemetryConfigurationSectionNames.GenevaExporter, StringComparison.OrdinalIgnoreCase))
+                else
                 {
-                    FlagSwitch(type, new (ExporterType, Action)[] {
+                    // If AzureMonitor configuration is set, we have to wire that up a special way
+                    if (section.Key.Equals(OpenTelemetryConfigurationSectionNames.AzureMonitorExporter, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Debug.Assert(type.HasFlag(ExporterType.Logging), "Azure Monitor sections should be labeled as logging exporter type");
+
+                        appInsightsConfigured = true;
+
+                        otBuilder.UseAzureMonitor(section.OtelBind);
+
+                        // Facilitate worker's use of ApplicationInsights
+                        Environment.SetEnvironmentVariable(EnvironmentSettingNames.AppInsightsConnectionString, section["ConnectionString"]);
+
+                        // Ignore azureMonitor at the traces/metrics level because 'Distro' only supports one definition; we've chosen to use the 'logging'
+                    }
+                    else if (section.Key.Equals(OpenTelemetryConfigurationSectionNames.GenevaExporter, StringComparison.OrdinalIgnoreCase))
+                    {
+                        FlagSwitch(type, new (ExporterType, Action)[] {
                         (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(b => b.AddGenevaLogExporter(section.OtelBind))),
                         (ExporterType.Metrics, () => otBuilder.WithMetrics(b => b.AddGenevaMetricExporter(section.OtelBind))),
                         (ExporterType.Traces, () => otBuilder.WithTracing(b => b.AddGenevaTraceExporter(section.OtelBind)))
                     });
-                }
-                else if (section.Key.Equals(OpenTelemetryConfigurationSectionNames.ConstantExporter, StringComparison.OrdinalIgnoreCase))
-                {
-                    FlagSwitch(type, new (ExporterType, Action)[] {
+                    }
+                    else if (section.Key.Equals(OpenTelemetryConfigurationSectionNames.ConstantExporter, StringComparison.OrdinalIgnoreCase))
+                    {
+                        FlagSwitch(type, new (ExporterType, Action)[] {
                         (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(b => b.AddConsoleExporter(section.OtelBind))),
                         (ExporterType.Metrics, () => otBuilder.WithMetrics(b => b.AddConsoleExporter(section.OtelBind))),
                         (ExporterType.Traces, () => otBuilder.WithTracing(b => b.AddConsoleExporter(section.OtelBind)))
                     });
-                }
-                else
-                {
-                    Debug.Fail($@"Unhandled 'Well Known' otel exporter: {section.Key}");
+                    }
+                    else
+                    {
+                        Debug.Fail($@"Unhandled 'Well Known' otel exporter: {section.Key}");
+                    }
                 }
             }
         }
