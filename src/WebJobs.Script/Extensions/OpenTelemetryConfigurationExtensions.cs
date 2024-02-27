@@ -121,10 +121,10 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
                 if (!WellKnownOpenTelemetryExporters.Contains(section.Key, StringComparer.OrdinalIgnoreCase))
                 {
                     FlagSwitch(type, new (ExporterType, Action)[] {
-                    (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(o => o.AddOtlpExporter(section.Key, section.Bind))),
-                    (ExporterType.Metrics, () => otBuilder.WithMetrics(o => o.AddOtlpExporter(section.Key, section.Bind))),
-                    (ExporterType.Traces, () => otBuilder.WithTracing(o => o.AddOtlpExporter(section.Key, section.Bind)))
-                });
+                        (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(o => o.AddOtlpExporter(section.Key, section.Bind))),
+                        (ExporterType.Metrics, () => otBuilder.WithMetrics(o => o.AddOtlpExporter(section.Key, section.Bind))),
+                        (ExporterType.Traces, () => otBuilder.WithTracing(o => o.AddOtlpExporter(section.Key, section.Bind)))
+                    });
                 }
                 else
                 {
@@ -137,26 +137,23 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
 
                         otBuilder.UseAzureMonitor(section.OtelBind);
 
-                        // Facilitate worker's use of ApplicationInsights
-                        Environment.SetEnvironmentVariable(EnvironmentSettingNames.AppInsightsConnectionString, section["ConnectionString"]);
-
                         // Ignore azureMonitor at the traces/metrics level because 'Distro' only supports one definition; we've chosen to use the 'logging'
                     }
                     else if (section.Key.Equals(OpenTelemetryConfigurationSectionNames.GenevaExporter, StringComparison.OrdinalIgnoreCase))
                     {
                         FlagSwitch(type, new (ExporterType, Action)[] {
-                        (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(b => b.AddGenevaLogExporter(section.OtelBind))),
-                        (ExporterType.Metrics, () => otBuilder.WithMetrics(b => b.AddGenevaMetricExporter(section.OtelBind))),
-                        (ExporterType.Traces, () => otBuilder.WithTracing(b => b.AddGenevaTraceExporter(section.OtelBind)))
-                    });
+                            (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(b => b.AddGenevaLogExporter(section.OtelBind))),
+                            (ExporterType.Metrics, () => otBuilder.WithMetrics(b => b.AddGenevaMetricExporter(section.OtelBind))),
+                            (ExporterType.Traces, () => otBuilder.WithTracing(b => b.AddGenevaTraceExporter(section.OtelBind)))
+                        });
                     }
                     else if (section.Key.Equals(OpenTelemetryConfigurationSectionNames.ConstantExporter, StringComparison.OrdinalIgnoreCase))
                     {
                         FlagSwitch(type, new (ExporterType, Action)[] {
-                        (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(b => b.AddConsoleExporter(section.OtelBind))),
-                        (ExporterType.Metrics, () => otBuilder.WithMetrics(b => b.AddConsoleExporter(section.OtelBind))),
-                        (ExporterType.Traces, () => otBuilder.WithTracing(b => b.AddConsoleExporter(section.OtelBind)))
-                    });
+                            (ExporterType.Logging, () => loggingBuilder.AddOpenTelemetry(b => b.AddConsoleExporter(section.OtelBind))),
+                            (ExporterType.Metrics, () => otBuilder.WithMetrics(b => b.AddConsoleExporter(section.OtelBind))),
+                            (ExporterType.Traces, () => otBuilder.WithTracing(b => b.AddConsoleExporter(section.OtelBind)))
+                        });
                     }
                     else
                     {
