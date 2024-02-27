@@ -175,6 +175,8 @@ namespace Microsoft.Azure.WebJobs.Script
 
         public static bool IsFunctionDataCacheEnabled { get; set; }
 
+        public static bool WorkerApplicationInsightsLoggingEnabled { get; internal set; }
+
         /// <summary>
         /// Gets the collection of all valid Functions. For functions that are in error
         /// and were unable to load successfully, consult the <see cref="FunctionErrors"/> collection.

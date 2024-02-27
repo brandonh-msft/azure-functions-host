@@ -469,6 +469,12 @@ namespace Microsoft.Azure.WebJobs.Script.Grpc
                 appInsightsWorkerEnabled))
             {
                 _isWorkerApplicationInsightsLoggingEnabled = true;
+
+                ScriptHost.WorkerApplicationInsightsLoggingEnabled = true;
+            }
+            else
+            {
+                ScriptHost.WorkerApplicationInsightsLoggingEnabled = false;
             }
 
             // If http proxying is enabled, we need to get the proxying endpoint of this worker
