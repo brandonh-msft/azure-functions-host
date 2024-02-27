@@ -1,6 +1,7 @@
 ﻿using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Script.Configuration;
+using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -55,7 +56,9 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             }
 
             var services = loggingBuilder.Services;
-            OpenTelemetryBuilder otBuilder = services.AddOpenTelemetry();
+            OpenTelemetryBuilder otBuilder = services.AddOpenTelemetry()
+                .WithTracing(c => c.AddProcessor(OtelActivitySanitizingProcessor.Instance))
+                .ConfigureResource(rb => ConfigureOpenTelemetryResourceBuilder(context, rb));
 
             var specificOtelConfig = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, OpenTelemetryConfigurationSectionNames.OpenTelemetry));
             if (specificOtelConfig.Exists())
@@ -67,7 +70,7 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
                 // These are messages piped back to the host from the worker - we don't handle these anymore.
                 // Instead, we expect the user's own code to be logging these where they want them to go.
                 .AddFilter("Host.Function.Console", LogLevel.None)
-                .AddFilter("Function.*", LogLevel.None);
+                .AddFilter("Function.*", LogLevel.None);    // Function.* also removes 'Executing' & 'Executed' logs which we don't need in OpenTelemetry-based executions as Activities encompass these.
 
             // Configure opentelemetry exporters from host.config / opentelemetry / exporters across all 3 avenues
             var exporterConfig = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.OpenTelemetry, OpenTelemetryConfigurationSectionNames.Exporters));
@@ -75,7 +78,6 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             {
                 RegisterExporter(loggingBuilder, otBuilder, section,
                     ExporterType.Logging | ExporterType.Traces | ExporterType.Metrics,
-                    rb => ConfigureOpenTelemetryResourceBuilder(context, rb),
                     ref appInsightsConfigured);
             }
 
@@ -86,7 +88,7 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             specificOtelConfig = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, OpenTelemetryConfigurationSectionNames.OpenTelemetry, OpenTelemetryConfigurationSectionNames.Exporters));
             foreach (var section in specificOtelConfig.GetChildren())
             {
-                RegisterExporter(loggingBuilder, otBuilder, section, ExporterType.Logging, rb => ConfigureOpenTelemetryResourceBuilder(context, rb), ref appInsightsConfigured);
+                RegisterExporter(loggingBuilder, otBuilder, section, ExporterType.Logging, ref appInsightsConfigured);
             }
 
             // Configure Otel Logging based on host.config / metrics / openTelemetry
@@ -129,10 +131,10 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
         private static void RegisterExporter(OpenTelemetryBuilder otBuilder, IConfigurationSection section, ExporterType type)
         {
             bool throwaway = false;
-            RegisterExporter(null, otBuilder, section, type, null, ref throwaway);
+            RegisterExporter(null, otBuilder, section, type, ref throwaway);
         }
 
-        private static void RegisterExporter(ILoggingBuilder loggingBuilder, OpenTelemetryBuilder otBuilder, IConfigurationSection section, ExporterType type, Action<ResourceBuilder> configureResource, ref bool appInsightsConfigured)
+        private static void RegisterExporter(ILoggingBuilder loggingBuilder, OpenTelemetryBuilder otBuilder, IConfigurationSection section, ExporterType type, ref bool appInsightsConfigured)
         {
             if (!WellKnownOpenTelemetryExporters.Contains(section.Key, StringComparer.OrdinalIgnoreCase))
             {
@@ -152,10 +154,9 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
                     appInsightsConfigured = true;
 
                     otBuilder.UseAzureMonitor(section.OtelBind);
-                    if (configureResource is not null)
-                    {
-                        otBuilder.ConfigureResource(configureResource);
-                    }
+
+                    // Facilitate worker's use of ApplicationInsights
+                    Environment.SetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING", section["ConnectionString"]);
 
                     // Ignore azureMonitor at the traces/metrics level because 'Distro' only supports one definition; we've chosen to use the 'logging'
                 }
