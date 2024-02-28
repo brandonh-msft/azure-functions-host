@@ -1,13 +1,6 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using System;
-using System.Collections.ObjectModel;
-using System.IO;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.ApplicationInsights.AspNetCore;
 using Microsoft.ApplicationInsights.AspNetCore.Extensions;
 using Microsoft.ApplicationInsights.DependencyCollector;
@@ -25,6 +18,15 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+using System;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using static Microsoft.Azure.WebJobs.Script.EnvironmentSettingNames;
 using IApplicationLifetime = Microsoft.AspNetCore.Hosting.IApplicationLifetime;
 
@@ -782,6 +784,8 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             }
             finally
             {
+                FlushOpenTelemetry(instance);
+
                 GetHostLogger(instance).LogDebug("Disposing ScriptHost.");
 
                 if (isStandbyHost && !_scriptWebHostEnvironment.InStandbyMode)
@@ -810,6 +814,28 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                     instance.Dispose();
                     _logger.LogDebug("ScriptHost disposed");
                 }
+            }
+        }
+
+        private void FlushOpenTelemetry(IHost host)
+        {
+            var logger = GetHostLogger(host);
+            foreach (var meterProvider in host.Services.GetServices<MeterProvider>())
+            {
+                logger.LogDebug(@"Flushing {providerName} ...", meterProvider);
+                meterProvider.ForceFlush();
+            }
+
+            foreach (var tracerProvider in host.Services.GetServices<TracerProvider>())
+            {
+                logger.LogDebug(@"Flushing {providerName} ...", tracerProvider);
+                tracerProvider.ForceFlush();
+            }
+
+            foreach (var logProvider in host.Services.GetServices<ILoggerProvider>().Where(i => i is OpenTelemetryLoggerProvider))
+            {
+                logger.LogDebug(@"Disposing {providerName} ...", logProvider);
+                logProvider.Dispose();
             }
         }
 
