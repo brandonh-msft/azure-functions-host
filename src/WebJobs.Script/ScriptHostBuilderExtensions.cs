@@ -1,9 +1,6 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Channel;
 using Microsoft.ApplicationInsights.DataContracts;
@@ -42,6 +39,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Configuration;
 using Microsoft.Extensions.Options;
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace Microsoft.Azure.WebJobs.Script
 {
@@ -95,7 +95,7 @@ namespace Microsoft.Azure.WebJobs.Script
 
                 loggingBuilder.AddConsoleIfEnabled(context);
 
-                loggingBuilder.ConfigureOpenTelemetry(context, out bool appInsightsOtelConfigured);
+                loggingBuilder.ConfigureOpenTelemetry(out bool appInsightsOtelConfigured);
                 if (!appInsightsOtelConfigured)
                 {
                     ConfigureApplicationInsights(context, loggingBuilder);
