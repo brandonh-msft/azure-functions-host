@@ -66,14 +66,14 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             }
 
             loggingBuilder
-                // These are messages piped back to the host from the worker - we don't handle these anymore if the worker has appinsights enabled.
-                // Instead, we expect the user's own code to be logging these where they want them to go.
+            // These are messages piped back to the host from the worker - we don't handle these anymore if the worker has appinsights enabled.
+            // Instead, we expect the user's own code to be logging these where they want them to go.
                 .AddFilter("Host.Function.Console", (level) => !ScriptHost.WorkerApplicationInsightsLoggingEnabled)
                 .AddFilter("Function.*", (level) => !ScriptHost.WorkerApplicationInsightsLoggingEnabled);    // Function.* also removes 'Executing' & 'Executed' logs which we don't need in OpenTelemetry-based executions as Activities encompass these.
 
             // Configure opentelemetry exporters from host.config / opentelemetry / exporters across all 3 avenues
             var exporterConfig = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.OpenTelemetry, OpenTelemetryConfigurationSectionNames.Exporters));
-            RegisterExporters(loggingBuilder, otBuilder, exporterConfig.GetChildren(),
+            RegisterFileConfiguredExporters(loggingBuilder, otBuilder, exporterConfig.GetChildren(),
                 ExporterType.Logging | ExporterType.Traces | ExporterType.Metrics,
                 ref appInsightsConfigured);
 
@@ -82,15 +82,15 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
 
             // Configure Otel Logging based on host.config / logging / openTelemetry
             specificOtelConfig = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.Logging, OpenTelemetryConfigurationSectionNames.OpenTelemetry, OpenTelemetryConfigurationSectionNames.Exporters));
-            RegisterExporters(loggingBuilder, otBuilder, specificOtelConfig.GetChildren(), ExporterType.Logging, ref appInsightsConfigured);
+            RegisterFileConfiguredExporters(loggingBuilder, otBuilder, specificOtelConfig.GetChildren(), ExporterType.Logging, ref appInsightsConfigured);
 
             // Configure Otel Metrics based on host.config / metrics / openTelemetry
             specificOtelConfig = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.Metrics, OpenTelemetryConfigurationSectionNames.OpenTelemetry, OpenTelemetryConfigurationSectionNames.Exporters));
-            RegisterExporters(otBuilder, specificOtelConfig.GetChildren(), ExporterType.Metrics);
+            RegisterFileConfiguredExporters(otBuilder, specificOtelConfig.GetChildren(), ExporterType.Metrics);
 
             // Configure Otel Traces based on host.config / traces / openTelemetry
             specificOtelConfig = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, OpenTelemetryConfigurationSectionNames.Traces, OpenTelemetryConfigurationSectionNames.OpenTelemetry, OpenTelemetryConfigurationSectionNames.Exporters));
-            RegisterExporters(otBuilder, specificOtelConfig.GetChildren(), ExporterType.Traces);
+            RegisterFileConfiguredExporters(otBuilder, specificOtelConfig.GetChildren(), ExporterType.Traces);
 
             otBuilder.ConfigureResource(rb => ConfigureOpenTelemetryResourceBuilder(context, rb));
         }
@@ -107,14 +107,14 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
 
         private static readonly ImmutableArray<string> WellKnownOpenTelemetryExporters = ImmutableArray.Create(OpenTelemetryConfigurationSectionNames.ConstantExporter, OpenTelemetryConfigurationSectionNames.GenevaExporter, OpenTelemetryConfigurationSectionNames.AzureMonitorExporter);
 
-        private static void RegisterExporters(OpenTelemetryBuilder otBuilder, IEnumerable<IConfigurationSection> sections, ExporterType type)
+        private static void RegisterFileConfiguredExporters(OpenTelemetryBuilder otBuilder, IEnumerable<IConfigurationSection> sections, ExporterType type)
         {
             bool throwaway = false;
 
-            RegisterExporters(null, otBuilder, sections, type, ref throwaway);
+            RegisterFileConfiguredExporters(null, otBuilder, sections, type, ref throwaway);
         }
 
-        private static void RegisterExporters(ILoggingBuilder loggingBuilder, OpenTelemetryBuilder otBuilder, IEnumerable<IConfigurationSection> sections, ExporterType type, ref bool appInsightsConfigured)
+        private static void RegisterFileConfiguredExporters(ILoggingBuilder loggingBuilder, OpenTelemetryBuilder otBuilder, IEnumerable<IConfigurationSection> sections, ExporterType type, ref bool appInsightsConfigured)
         {
             foreach (var section in sections)
             {
