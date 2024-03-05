@@ -1,15 +1,18 @@
-﻿using Microsoft.Azure.WebJobs.Script.Configuration;
+﻿using Azure.Monitor.OpenTelemetry.AspNetCore;
+using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-
-using OpenTelemetry;
+using Microsoft.Extensions.Options;
 using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 using System;
+using System.Diagnostics;
 
 namespace Microsoft.Azure.WebJobs.Script.Extensions
 {
@@ -39,17 +42,51 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
                 return;
             }
 
-            var services = loggingBuilder.Services;
-            OpenTelemetryBuilder otBuilder = services.AddOpenTelemetry()
-                .WithTracing(c => c.AddProcessor(OtelActivitySanitizingProcessor.Instance));
-
-            loggingBuilder.AddOpenTelemetry();
-
-            loggingBuilder
-            // These are messages piped back to the host from the worker - we don't handle these anymore if the worker has appinsights enabled.
-            // Instead, we expect the user's own code to be logging these where they want them to go.
+            loggingBuilder.AddOpenTelemetry(c => c.AddOtlpExporter())
+                // These are messages piped back to the host from the worker - we don't handle these anymore if the worker has appinsights enabled.
+                // Instead, we expect the user's own code to be logging these where they want them to go.
                 .AddFilter("Host.Function.Console", _ => !ScriptHost.WorkerApplicationInsightsLoggingEnabled)
                 .AddFilter("Function.*", _ => !ScriptHost.WorkerApplicationInsightsLoggingEnabled);    // Function.* also removes 'Executing' & 'Executed' logs which we don't need in OpenTelemetry-based executions as Activities encompass these.
+
+            loggingBuilder.Services.AddOpenTelemetry()
+                .ConfigureResource(r =>
+                {
+                    var version = typeof(ScriptHost).Assembly.GetName().Version.ToString();
+                    r.AddService("azureFunctions", serviceVersion: version);
+                    // Set the AI SDK to a key so we know all the telemetry came from the Functions Host
+                    // NOTE: This ties to \azure-sdk-for-net\sdk\monitor\Azure.Monitor.OpenTelemetry.Exporter\src\Internals\ResourceExtensions.cs :: AiSdkPrefixKey used in CreateAzureMonitorResource()
+                    r.AddAttributes([
+                        new("ai.sdk.prefix", $@"azurefunctionscoretools: {version} "),
+                        new("azurefunctionscoretools_version", version),
+                        new(ScriptConstants.LogPropertyProcessIdKey, Process.GetCurrentProcess().Id)
+                    ]);
+                })
+                .WithTracing(c => c.AddProcessor(OtelActivitySanitizingProcessor.Instance).AddOtlpExporter())
+                .WithMetrics(c => c.AddOtlpExporter())
+                .UseAzureMonitor();
+        }
+
+        public static void AddHostInstanceIdToOpenTelemetry(this IServiceCollection services)
+        {
+            if (bool.TryParse(Environment.GetEnvironmentVariable(EnvironmentSettingNames.OtelSdkDisabled) ?? bool.TrueString, out var b) && !b)
+            {
+                services.AddOpenTelemetry().ConfigureResource(r =>
+                {
+                    ServiceProvider sp = services.BuildServiceProvider();
+                    var o = sp.GetService<IOptions<ScriptJobHostOptions>>().Value;
+
+                    //sp.GetService<IOptions<ScriptJobHostOptions>>();
+                    var instanceId = o.InstanceId;
+                    if (!string.IsNullOrWhiteSpace(instanceId))
+                    {
+                        r.AddAttributes([
+                            new(ScriptConstants.LogPropertyHostInstanceIdKey, instanceId)
+                        ]);
+
+                        Environment.SetEnvironmentVariable(ScriptConstants.LogPropertyHostInstanceIdKey, instanceId);
+                    }
+                });
+            }
         }
 
         public static void AddOpenTelemetryConfigurations(this IConfigurationBuilder configBuilder, HostBuilderContext context)
