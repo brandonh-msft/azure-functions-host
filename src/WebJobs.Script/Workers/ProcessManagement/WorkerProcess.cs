@@ -46,6 +46,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers
             _serviceProvider = serviceProvider;
             _environment = environment;
             _toolingConsoleJsonLoggerLazy = new Lazy<ILogger>(() => loggerFactory.CreateLogger(WorkerConstants.ToolingConsoleLogCategoryName), isThreadSafe: true);
+            _environment.SetEnvironmentVariable(ScriptConstants.LogPropertyHostInstanceIdKey, serviceProvider.GetService<IOptions<ScriptJobHostOptions>>()?.Value.InstanceId ?? string.Empty);
 
             // We subscribe to host start events so we can handle the restart that occurs
             // on host specialization.
