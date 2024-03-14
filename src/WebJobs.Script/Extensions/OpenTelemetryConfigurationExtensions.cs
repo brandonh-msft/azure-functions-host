@@ -61,7 +61,10 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
                         new(ScriptConstants.LogPropertyProcessIdKey, Process.GetCurrentProcess().Id)
                     ]);
                 })
-                .WithTracing(c => c.AddProcessor(OtelActivitySanitizingProcessor.Instance).AddOtlpExporter())
+                .WithTracing(c => c
+                    .AddProcessor(OtelActivitySanitizingProcessor.Instance)
+                    .AddProcessor(OtelWorkerTraceFilterProcessor.Instance)
+                    .AddOtlpExporter())
                 .WithMetrics(c => c.AddOtlpExporter())
                 .UseAzureMonitor();
         }
