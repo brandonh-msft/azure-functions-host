@@ -67,6 +67,8 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
                     .AddOtlpExporter())
                 .WithMetrics(c => c.AddOtlpExporter())
                 .UseAzureMonitor();
+
+            appInsightsConfigured = true;
         }
 
         public static void AddHostInstanceIdToOpenTelemetry(this IServiceCollection services)
