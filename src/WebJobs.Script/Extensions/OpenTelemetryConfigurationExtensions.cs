@@ -45,8 +45,10 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             loggingBuilder.AddOpenTelemetry(c => c.AddOtlpExporter())
                 // These are messages piped back to the host from the worker - we don't handle these anymore if the worker has appinsights enabled.
                 // Instead, we expect the user's own code to be logging these where they want them to go.
-                .AddFilter("Host.Function.Console", _ => !ScriptHost.WorkerApplicationInsightsLoggingEnabled)
-                .AddFilter("Function.*", _ => !ScriptHost.WorkerApplicationInsightsLoggingEnabled);    // Function.* also removes 'Executing' & 'Executed' logs which we don't need in OpenTelemetry-based executions as Activities encompass these.
+                .AddFilter<OpenTelemetryLoggerProvider>("Host.*", _ => !ScriptHost.WorkerApplicationInsightsLoggingEnabled)
+                .AddFilter<OpenTelemetryLoggerProvider>("Function.*", _ => !ScriptHost.WorkerApplicationInsightsLoggingEnabled)    // Function.* also removes 'Executing' & 'Executed' logs which we don't need in OpenTelemetry-based executions as Activities encompass these.
+                .AddFilter<OpenTelemetryLoggerProvider>("Azure.*", _ => !ScriptHost.WorkerApplicationInsightsLoggingEnabled)
+                .AddFilter<OpenTelemetryLoggerProvider>("Microsoft.Azure.WebJobs.*", _ => !ScriptHost.WorkerApplicationInsightsLoggingEnabled);
 
             loggingBuilder.Services.AddOpenTelemetry()
                 .ConfigureResource(r =>

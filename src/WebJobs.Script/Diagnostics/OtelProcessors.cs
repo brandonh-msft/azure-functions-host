@@ -2,7 +2,7 @@
 using OpenTelemetry;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace Microsoft.Azure.WebJobs.Script.Diagnostics
 {
@@ -53,27 +53,34 @@ namespace Microsoft.Azure.WebJobs.Script.Diagnostics
             base.OnEnd(data);
         }
 
-        private void DropDependencyTracesToHostLoopbackEndpoints(Activity data, ImmutableDictionary<string, string> dataTags)
+        private void DropDependencyTracesToHostLoopbackEndpoints(Activity data, IImmutableDictionary<string, string> dataTags)
         {
-            if (data.ActivityTraceFlags is ActivityTraceFlags.Recorded
-                && dataTags.TryGetValue("url.full", out string url))
+            if (data.ActivityTraceFlags is ActivityTraceFlags.Recorded)
             {
-                if (url.Contains("/AzureFunctionsRpcMessages.FunctionRpc/", System.StringComparison.OrdinalIgnoreCase)
-                    || url.EndsWith("/getscripttag", System.StringComparison.OrdinalIgnoreCase))
+                var url = GetUrlTagValue(dataTags);
+                if (url?.Contains("/AzureFunctionsRpcMessages.FunctionRpc/", System.StringComparison.OrdinalIgnoreCase) is true
+                    || url?.EndsWith("/getScriptTag", System.StringComparison.OrdinalIgnoreCase) is true)
                 {
                     data.ActivityTraceFlags = ActivityTraceFlags.None;
                 }
             }
         }
 
-        private void DropDependencyTracesToAppInsightsEndpoints(Activity data, ImmutableDictionary<string, string> dataTags)
+        private string GetUrlTagValue(IImmutableDictionary<string, string> dataTags)
+        {
+            string url;
+            _ = dataTags.TryGetValue("url.full", out url) || dataTags.TryGetValue("http.url", out url);
+            return url;
+        }
+
+        private void DropDependencyTracesToAppInsightsEndpoints(Activity data, IImmutableDictionary<string, string> dataTags)
         {
             if (data.ActivityTraceFlags is ActivityTraceFlags.Recorded
-                && data.Source.Name is "Azure.Core.Http" or "System.Net.Http"
-                && dataTags.TryGetValue("url.full", out string url))
+                && data.Source.Name is "Azure.Core.Http" or "System.Net.Http")
             {
-                if (url.Contains("applicationinsights.azure.com", System.StringComparison.OrdinalIgnoreCase)
-                    || url.Contains("rt.services.visualstudio.com/QuickPulseService.svc", System.StringComparison.OrdinalIgnoreCase))
+                string url = GetUrlTagValue(dataTags);
+                if (url?.Contains("applicationinsights.azure.com", System.StringComparison.OrdinalIgnoreCase) is true
+                    || url?.Contains("rt.services.visualstudio.com/QuickPulseService.svc", System.StringComparison.OrdinalIgnoreCase) is true)
                 {
                     // don't record all the HTTP calls to Live Stream aka QuickPulse
                     data.ActivityTraceFlags = ActivityTraceFlags.None;
@@ -81,22 +88,22 @@ namespace Microsoft.Azure.WebJobs.Script.Diagnostics
             }
         }
 
-        private void DropDependencyTracesToHostStorageEndpoints(Activity data, ImmutableDictionary<string, string> dataTags)
+        private void DropDependencyTracesToHostStorageEndpoints(Activity data, IImmutableDictionary<string, string> dataTags)
         {
             if (data.ActivityTraceFlags is ActivityTraceFlags.Recorded)
             {
                 if (data.Source.Name is "Azure.Core.Http" or "System.Net.Http"
                     && dataTags.TryGetValue("az.namespace", out string azNamespace)
-                    && azNamespace is "Microsoft.Storage"
-                    && dataTags.TryGetValue("url.full", out string url)
-                    && AzureWebjobsUrl.IsMatch(url))
+                    && azNamespace is "Microsoft.Storage")
+                {
+                    string url = GetUrlTagValue(dataTags);
+                    if (url?.Contains("/azure-webjobs-", System.StringComparison.OrdinalIgnoreCase) is true)
                 {
                     // don't record all the HTTP calls to backing storage used by the host
                     data.ActivityTraceFlags = ActivityTraceFlags.None;
                 }
             }
         }
-
-        private static readonly Regex AzureWebjobsUrl = new(@".+/azure-webjobs-(hosts|secrets)[/?]?.+", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+        }
     }
 }
