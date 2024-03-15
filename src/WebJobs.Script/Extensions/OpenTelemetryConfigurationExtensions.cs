@@ -37,7 +37,8 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             // It follows the schema used by OpenTelemetry.NET's support for IOptions
             // See https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/docs/trace/customizing-the-sdk/README.md#configuration-files-and-environment-variables
 
-            if (bool.TryParse(Environment.GetEnvironmentVariable(EnvironmentSettingNames.OtelSdkDisabled) ?? bool.TrueString, out var b) && b)
+            // Check if OpenTelemetry is enabled in the environment variables, if not present, default to false
+            if (bool.TryParse(Environment.GetEnvironmentVariable(EnvironmentSettingNames.OpenTelemetryEnabled) ?? bool.FalseString, out var b) && b)
             {
                 return;
             }
@@ -75,7 +76,7 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
 
         public static void AddHostInstanceIdToOpenTelemetry(this IServiceCollection services)
         {
-            if (bool.TryParse(Environment.GetEnvironmentVariable(EnvironmentSettingNames.OtelSdkDisabled) ?? bool.TrueString, out var b) && !b)
+            if (bool.TryParse(Environment.GetEnvironmentVariable(EnvironmentSettingNames.OpenTelemetryEnabled) ?? bool.FalseString, out var b) && !b)
             {
                 services.AddOpenTelemetry().ConfigureResource(r =>
                 {

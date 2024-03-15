@@ -144,6 +144,6 @@ namespace Microsoft.Azure.WebJobs.Script
 
         public const string DrainOnApplicationStopping = "FUNCTIONS_ENABLE_DRAIN_ON_APP_STOPPING";
 
-        public const string OtelSdkDisabled = "OTEL_SDK_DISABLED";
+        public const string OpenTelemetryEnabled = "OTEL_ENABLED";
     }
 }
