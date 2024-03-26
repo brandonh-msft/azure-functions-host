@@ -38,7 +38,7 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             // See https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/docs/trace/customizing-the-sdk/README.md#configuration-files-and-environment-variables
 
             // Check if OpenTelemetry is enabled in the environment variables, if not present, default to false
-            if (bool.TryParse(Environment.GetEnvironmentVariable(EnvironmentSettingNames.OpenTelemetryEnabled) ?? bool.FalseString, out var b) && b)
+            if (SystemEnvironment.Instance.IsValueTrue(EnvironmentSettingNames.OpenTelemetryEnabled))
             {
                 return;
             }

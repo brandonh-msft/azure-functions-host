@@ -1,14 +1,14 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+using Microsoft.Azure.WebJobs.Script.Config;
+using Microsoft.Azure.WebJobs.Script.Workers.Rpc;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using Microsoft.Azure.WebJobs.Script.Config;
-using Microsoft.Azure.WebJobs.Script.Workers.Rpc;
 using static Microsoft.Azure.WebJobs.Script.EnvironmentSettingNames;
 
 namespace Microsoft.Azure.WebJobs.Script
@@ -649,6 +649,12 @@ namespace Microsoft.Azure.WebJobs.Script
         public static bool IsTargetBasedScalingEnabled(this IEnvironment environment)
         {
             return !string.Equals(environment.GetEnvironmentVariable(TargetBaseScalingEnabled), "0");
+        }
+
+        public static bool IsValueTrue(this IEnvironment environment, string envVarName, bool valueIfNotFound = false)
+        {
+            var stringValue = environment.GetEnvironmentVariableOrDefault(envVarName.Trim(), valueIfNotFound.ToString()).Trim();
+            return bool.TryParse(stringValue, out bool value) ? value : stringValue is "1";
         }
     }
 }

@@ -1,10 +1,10 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using System;
-using System.Collections.Generic;
 using Microsoft.Azure.WebJobs.Script.Workers.Rpc;
 using Microsoft.WebJobs.Script.Tests;
+using System;
+using System.Collections.Generic;
 using Xunit;
 using static Microsoft.Azure.WebJobs.Script.EnvironmentSettingNames;
 
@@ -453,6 +453,32 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Extensions
             environment.SetEnvironmentVariable(AzureFilesConnectionString, connectionString);
             environment.SetEnvironmentVariable(AzureFilesContentShare, contentShare);
             Assert.Equal(expected, environment.AzureFilesAppSettingsExist());
+        }
+
+
+        [Theory]
+        [InlineData(null, false)]
+        [InlineData("test ", false)]
+        [InlineData("", false)]
+        [InlineData(" ", false)]
+        [InlineData("-", false)]
+        [InlineData("null", false)]
+        [InlineData("0", false)]
+        [InlineData("false", false)]
+        [InlineData(" False", false)]
+        [InlineData("1 ", true)]
+        [InlineData("true", true)]
+        [InlineData("True", true)]
+        [InlineData(" True  ", true)]
+        public void IsValueTrue_ReturnsExpectedResult(string testValue, bool expectedResult)
+        {
+            var environment = new TestEnvironment();
+            var envVar = Guid.NewGuid().ToString("N");
+            if (testValue is not null)
+            {
+                environment.SetEnvironmentVariable(envVar, testValue);
+            }
+            Assert.Equal(expectedResult, environment.IsValueTrue(envVar));
         }
     }
 }
