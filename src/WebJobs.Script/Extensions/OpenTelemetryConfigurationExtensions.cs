@@ -29,19 +29,11 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             public const string FunctionsRuntimeInstrumentationTraces = "FunctionsRuntimeInstrumentation";
         }
 
-        public static void ConfigureOpenTelemetry(this ILoggingBuilder loggingBuilder, out bool appInsightsConfigured)
+        public static void ConfigureOpenTelemetry(this ILoggingBuilder loggingBuilder)
         {
-            appInsightsConfigured = false;
-
             // OpenTelemetry configuration for the host is specified in host.json
             // It follows the schema used by OpenTelemetry.NET's support for IOptions
             // See https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/docs/trace/customizing-the-sdk/README.md#configuration-files-and-environment-variables
-
-            // Check if OpenTelemetry is enabled in the environment variables, if not present, default to false
-            if (SystemEnvironment.Instance.IsValueTrue(EnvironmentSettingNames.OpenTelemetryEnabled))
-            {
-                return;
-            }
 
             loggingBuilder.AddOpenTelemetry(c => c.AddOtlpExporter())
                 // These are messages piped back to the host from the worker - we don't handle these anymore if the worker has appinsights enabled.

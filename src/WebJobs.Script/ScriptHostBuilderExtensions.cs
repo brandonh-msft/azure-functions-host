@@ -95,11 +95,7 @@ namespace Microsoft.Azure.WebJobs.Script
 
                 loggingBuilder.AddConsoleIfEnabled(context);
 
-                loggingBuilder.ConfigureOpenTelemetry(out bool appInsightsOtelConfigured);
-                if (!appInsightsOtelConfigured)
-                {
-                    ConfigureApplicationInsights(context, loggingBuilder);
-                }
+                ConfigureTelemetryMode(context, loggingBuilder);
             })
             .ConfigureAppConfiguration((context, configBuilder) =>
             {
@@ -157,6 +153,24 @@ namespace Microsoft.Azure.WebJobs.Script
                     }
                 }
             });
+
+            return builder;
+        }
+
+        private static ILoggingBuilder ConfigureTelemetryMode(HostBuilderContext context, ILoggingBuilder builder)
+        {
+            // Telemetry Mode is located in host.json at the root as "telemetryMode" but is optional
+            var mode = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.TelemetryMode))?.Get<TelemetryMode>() ?? TelemetryMode.ApplicationInsights;
+
+            if (mode is TelemetryMode.OpenTelemetry)
+            {
+                builder.ConfigureOpenTelemetry();
+            }
+            else if (mode is TelemetryMode.ApplicationInsights)
+            {
+                // Telemetry will only be put out by AppInsights if the env vars for key or connstring are also set, so this is safe to call always.
+                ConfigureApplicationInsights(context, builder);
+            }
 
             return builder;
         }
