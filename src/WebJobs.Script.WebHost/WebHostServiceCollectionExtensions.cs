@@ -88,7 +88,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             services.AddSingleton<IScriptHostManager>(s => s.GetRequiredService<WebJobsScriptHostService>());
             services.AddSingleton<IScriptWebHostEnvironment, ScriptWebHostEnvironment>();
             services.TryAddSingleton<IStandbyManager, StandbyManager>();
-            services.TryAddSingleton<IServiceCollection>(services);
             services.TryAddSingleton<IScriptHostBuilder, DefaultScriptHostBuilder>();
 
             // Linux container services

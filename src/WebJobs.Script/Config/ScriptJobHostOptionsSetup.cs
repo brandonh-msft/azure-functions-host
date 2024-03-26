@@ -1,9 +1,11 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using System;
+using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System;
 
 namespace Microsoft.Azure.WebJobs.Script.Configuration
 {
@@ -12,7 +14,6 @@ namespace Microsoft.Azure.WebJobs.Script.Configuration
         private readonly IConfiguration _configuration;
         private readonly IEnvironment _environment;
         private readonly IOptions<ScriptApplicationHostOptions> _applicationHostOptions;
-
         internal static readonly TimeSpan MinFunctionTimeout = TimeSpan.FromSeconds(1);
         internal static readonly TimeSpan DefaultConsumptionFunctionTimeout = TimeSpan.FromMinutes(5);
         internal static readonly TimeSpan MaxFunctionTimeoutDynamic = TimeSpan.FromMinutes(10);
@@ -72,6 +73,20 @@ namespace Microsoft.Azure.WebJobs.Script.Configuration
             options.TestDataPath = webHostOptions.TestDataPath;
             options.IsFileSystemReadOnly = webHostOptions.IsFileSystemReadOnly;
             options.IsStandbyConfiguration = webHostOptions.IsStandbyConfiguration;
+
+            options.TelemetryMode = TelemetryMode.ApplicationInsights;
+            var telemetryModeSection = jobHostSection.GetSection(ConfigurationSectionNames.TelemetryMode);
+            if (telemetryModeSection.Exists())
+            {
+                try
+                {
+                    options.TelemetryMode = telemetryModeSection.Get<TelemetryMode>();
+                }
+                catch
+                {
+                    // ignore bad/empty values and just revert to the default value
+                }
+            }
         }
 
         private void ConfigureFunctionTimeout(ScriptJobHostOptions options)

@@ -1,14 +1,14 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.ApplicationInsights.DependencyCollector;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.Azure.WebJobs.Logging.ApplicationInsights;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 
 namespace Microsoft.Azure.WebJobs.Script.Tests.Configuration
@@ -24,7 +24,7 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Configuration
                 host = new HostBuilder()
                     .ConfigureLogging((context, builder) =>
                     {
-                        ScriptHostBuilderExtensions.ConfigureApplicationInsights(context, builder);
+                        ScriptHostBuilderExtensions.ConfigureApplicationInsights(builder, context.Configuration);
                     })
                     .ConfigureServices(s =>
                     {

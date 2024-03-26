@@ -5,13 +5,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-
-using System;
 using System.Diagnostics;
 
 namespace Microsoft.Azure.WebJobs.Script.Extensions
@@ -29,19 +26,11 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
             public const string FunctionsRuntimeInstrumentationTraces = "FunctionsRuntimeInstrumentation";
         }
 
-        public static void ConfigureOpenTelemetry(this ILoggingBuilder loggingBuilder, out bool appInsightsConfigured)
+        public static void ConfigureOpenTelemetry(this ILoggingBuilder loggingBuilder)
         {
-            appInsightsConfigured = false;
-
             // OpenTelemetry configuration for the host is specified in host.json
             // It follows the schema used by OpenTelemetry.NET's support for IOptions
             // See https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/docs/trace/customizing-the-sdk/README.md#configuration-files-and-environment-variables
-
-            // Check if OpenTelemetry is enabled in the environment variables, if not present, default to false
-            if (SystemEnvironment.Instance.IsValueTrue(EnvironmentSettingNames.OpenTelemetryEnabled))
-            {
-                return;
-            }
 
             loggingBuilder.AddOpenTelemetry(c => c.AddOtlpExporter())
                 // These are messages piped back to the host from the worker - we don't handle these anymore if the worker has appinsights enabled.
@@ -70,31 +59,6 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
                     .AddOtlpExporter())
                 .WithMetrics(c => c.AddOtlpExporter())
                 .UseAzureMonitor();
-
-            appInsightsConfigured = true;
-        }
-
-        public static void AddHostInstanceIdToOpenTelemetry(this IServiceCollection services)
-        {
-            if (bool.TryParse(Environment.GetEnvironmentVariable(EnvironmentSettingNames.OpenTelemetryEnabled) ?? bool.FalseString, out var b) && !b)
-            {
-                services.AddOpenTelemetry().ConfigureResource(r =>
-                {
-                    ServiceProvider sp = services.BuildServiceProvider();
-                    var o = sp.GetService<IOptions<ScriptJobHostOptions>>().Value;
-
-                    //sp.GetService<IOptions<ScriptJobHostOptions>>();
-                    var instanceId = o.InstanceId;
-                    if (!string.IsNullOrWhiteSpace(instanceId))
-                    {
-                        r.AddAttributes([
-                            new(ScriptConstants.LogPropertyHostInstanceIdKey, instanceId)
-                        ]);
-
-                        Environment.SetEnvironmentVariable(ScriptConstants.LogPropertyHostInstanceIdKey, instanceId);
-                    }
-                });
-            }
         }
 
         public static void AddOpenTelemetryConfigurations(this IConfigurationBuilder configBuilder, HostBuilderContext context)

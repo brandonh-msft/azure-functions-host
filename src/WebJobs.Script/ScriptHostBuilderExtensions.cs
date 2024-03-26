@@ -95,11 +95,7 @@ namespace Microsoft.Azure.WebJobs.Script
 
                 loggingBuilder.AddConsoleIfEnabled(context);
 
-                loggingBuilder.ConfigureOpenTelemetry(out bool appInsightsOtelConfigured);
-                if (!appInsightsOtelConfigured)
-                {
-                    ConfigureApplicationInsights(context, loggingBuilder);
-                }
+                loggingBuilder.ConfigureTelemetry(context);
             })
             .ConfigureAppConfiguration((context, configBuilder) =>
             {
@@ -161,6 +157,28 @@ namespace Microsoft.Azure.WebJobs.Script
             return builder;
         }
 
+        private static void ConfigureTelemetry(this ILoggingBuilder loggingBuilder, HostBuilderContext context)
+        {
+            TelemetryMode mode = TelemetryMode.ApplicationInsights;
+
+            try
+            {
+                mode = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.TelemetryMode)).Get<TelemetryMode>();
+            }
+            catch { }
+
+            // Use switch statement so any change to the enum results in a build error if we don't handle it.
+            switch (mode)
+            {
+                case TelemetryMode.ApplicationInsights:
+                    loggingBuilder.ConfigureApplicationInsights(context.Configuration);
+                    break;
+                case TelemetryMode.OpenTelemetry:
+                    loggingBuilder.ConfigureOpenTelemetry();
+                    break;
+            }
+        }
+
         public static IHostBuilder AddScriptHostCore(this IHostBuilder builder, ScriptApplicationHostOptions applicationHostOptions, Action<IWebJobsBuilder> configureWebJobs = null, ILoggerFactory loggerFactory = null)
         {
             var skipHostInitialization = builder.Properties.ContainsKey(ScriptConstants.SkipHostInitializationKey);
@@ -193,8 +211,6 @@ namespace Microsoft.Azure.WebJobs.Script
                                 return new ExternalConfigurationStartupValidatorService(validator, originalConfig, environment, logger);
                             }
                         }
-
-                        services.AddHostInstanceIdToOpenTelemetry();
                     }
 
                     return NullHostedService.Instance;
@@ -312,6 +328,7 @@ namespace Microsoft.Azure.WebJobs.Script
                 services.AddSingleton<IOptions<ScriptApplicationHostOptions>>(new OptionsWrapper<ScriptApplicationHostOptions>(applicationHostOptions));
                 services.AddSingleton<IOptionsMonitor<ScriptApplicationHostOptions>>(new ScriptApplicationHostOptionsMonitor(applicationHostOptions));
                 services.ConfigureOptions<ScriptJobHostOptionsSetup>();
+                services.ConfigureOptions<HostInstancIdOTelWireup>();
                 services.ConfigureOptions<JobHostFunctionTimeoutOptionsSetup>();
                 // LanguageWorkerOptionsSetup should be registered in WebHostServiceCollection as well to enable starting worker processing in placeholder mode.
                 services.ConfigureOptions<LanguageWorkerOptionsSetup>();
@@ -374,6 +391,8 @@ namespace Microsoft.Azure.WebJobs.Script
             services.TryAddSingleton<HostPerformanceManager>();
             services.ConfigureOptions<HostHealthMonitorOptionsSetup>();
 
+            services.TryAddSingleton(services);
+
             AddProcessRegistry(services);
         }
 
@@ -407,10 +426,10 @@ namespace Microsoft.Azure.WebJobs.Script
             return builder;
         }
 
-        internal static void ConfigureApplicationInsights(HostBuilderContext context, ILoggingBuilder builder)
+        internal static void ConfigureApplicationInsights(this ILoggingBuilder builder, IConfiguration config)
         {
-            string appInsightsInstrumentationKey = context.Configuration[EnvironmentSettingNames.AppInsightsInstrumentationKey];
-            string appInsightsConnectionString = context.Configuration[EnvironmentSettingNames.AppInsightsConnectionString];
+            string appInsightsInstrumentationKey = config[EnvironmentSettingNames.AppInsightsInstrumentationKey];
+            string appInsightsConnectionString = config[EnvironmentSettingNames.AppInsightsConnectionString];
 
             // Initializing AppInsights services during placeholder mode as well to avoid the cost of JITting these objects during specialization
             if (!string.IsNullOrEmpty(appInsightsInstrumentationKey) || !string.IsNullOrEmpty(appInsightsConnectionString) || SystemEnvironment.Instance.IsPlaceholderModeEnabled())
