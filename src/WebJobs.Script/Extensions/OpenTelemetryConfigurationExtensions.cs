@@ -5,13 +5,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-
-using System;
 using System.Diagnostics;
 
 namespace Microsoft.Azure.WebJobs.Script.Extensions
@@ -62,31 +59,6 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
                     .AddOtlpExporter())
                 .WithMetrics(c => c.AddOtlpExporter())
                 .UseAzureMonitor();
-
-            appInsightsConfigured = true;
-        }
-
-        public static void AddHostInstanceIdToOpenTelemetry(this IServiceCollection services)
-        {
-            if (bool.TryParse(Environment.GetEnvironmentVariable(EnvironmentSettingNames.OpenTelemetryEnabled) ?? bool.FalseString, out var b) && !b)
-            {
-                services.AddOpenTelemetry().ConfigureResource(r =>
-                {
-                    ServiceProvider sp = services.BuildServiceProvider();
-                    var o = sp.GetService<IOptions<ScriptJobHostOptions>>().Value;
-
-                    //sp.GetService<IOptions<ScriptJobHostOptions>>();
-                    var instanceId = o.InstanceId;
-                    if (!string.IsNullOrWhiteSpace(instanceId))
-                    {
-                        r.AddAttributes([
-                            new(ScriptConstants.LogPropertyHostInstanceIdKey, instanceId)
-                        ]);
-
-                        Environment.SetEnvironmentVariable(ScriptConstants.LogPropertyHostInstanceIdKey, instanceId);
-                    }
-                });
-            }
         }
 
         public static void AddOpenTelemetryConfigurations(this IConfigurationBuilder configBuilder, HostBuilderContext context)

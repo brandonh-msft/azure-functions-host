@@ -1,11 +1,12 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
+using Microsoft.Azure.WebJobs.Script.Description;
+using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
-using Microsoft.Azure.WebJobs.Script.Description;
 
 namespace Microsoft.Azure.WebJobs.Script
 {
@@ -122,5 +123,10 @@ namespace Microsoft.Azure.WebJobs.Script
         /// Gets or sets a value indicating whether the ScriptHost is in standby mode.
         /// </summary>
         public bool IsStandbyConfiguration { get; set; }
+
+        /// <summary>
+        /// Gets the telemetry mode.
+        /// </summary>
+        internal TelemetryMode TelemetryMode { get; set; }
     }
 }

@@ -1,28 +1,34 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
-using System;
+using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Resources;
+using System;
 
 namespace Microsoft.Azure.WebJobs.Script.Configuration
 {
-    internal class ScriptJobHostOptionsSetup : IConfigureOptions<ScriptJobHostOptions>
+    internal class ScriptJobHostOptionsSetup : IConfigureOptions<ScriptJobHostOptions>, IPostConfigureOptions<ScriptJobHostOptions>
     {
         private readonly IConfiguration _configuration;
         private readonly IEnvironment _environment;
         private readonly IOptions<ScriptApplicationHostOptions> _applicationHostOptions;
+        private readonly IServiceCollection _services;
 
         internal static readonly TimeSpan MinFunctionTimeout = TimeSpan.FromSeconds(1);
         internal static readonly TimeSpan DefaultConsumptionFunctionTimeout = TimeSpan.FromMinutes(5);
         internal static readonly TimeSpan MaxFunctionTimeoutDynamic = TimeSpan.FromMinutes(10);
         internal static readonly TimeSpan DefaultFunctionTimeout = TimeSpan.FromMinutes(30);
 
-        public ScriptJobHostOptionsSetup(IConfiguration configuration, IEnvironment environment, IOptions<ScriptApplicationHostOptions> applicationHostOptions)
+        public ScriptJobHostOptionsSetup(IConfiguration configuration, IEnvironment environment, IOptions<ScriptApplicationHostOptions> applicationHostOptions, IServiceCollection services)
         {
             _configuration = configuration;
             _environment = environment;
             _applicationHostOptions = applicationHostOptions;
+            _services = services;
         }
 
         public void Configure(ScriptJobHostOptions options)
@@ -72,6 +78,7 @@ namespace Microsoft.Azure.WebJobs.Script.Configuration
             options.TestDataPath = webHostOptions.TestDataPath;
             options.IsFileSystemReadOnly = webHostOptions.IsFileSystemReadOnly;
             options.IsStandbyConfiguration = webHostOptions.IsStandbyConfiguration;
+            options.TelemetryMode = jobHostSection.GetSection(ConfigurationSectionNames.TelemetryMode)?.Get<TelemetryMode>() ?? TelemetryMode.ApplicationInsights;
         }
 
         private void ConfigureFunctionTimeout(ScriptJobHostOptions options)
@@ -114,6 +121,15 @@ namespace Microsoft.Azure.WebJobs.Script.Configuration
         private bool SkuSupportsUnboundedTimeout(IEnvironment environment)
         {
             return !environment.IsConsumptionSku() || environment.IsFlexConsumptionSku();
+        }
+
+        public void PostConfigure(string name, ScriptJobHostOptions options)
+        {
+            var instanceId = options?.InstanceId;
+            if (options.TelemetryMode is TelemetryMode.OpenTelemetry && !string.IsNullOrWhiteSpace(instanceId))
+            {
+                _services.AddOpenTelemetry().ConfigureResource(r => r.AddAttributes([new(ScriptConstants.LogPropertyHostInstanceIdKey, instanceId)]));
+            }
         }
     }
 }

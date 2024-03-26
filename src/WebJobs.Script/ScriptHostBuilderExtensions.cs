@@ -207,8 +207,6 @@ namespace Microsoft.Azure.WebJobs.Script
                                 return new ExternalConfigurationStartupValidatorService(validator, originalConfig, environment, logger);
                             }
                         }
-
-                        services.AddHostInstanceIdToOpenTelemetry();
                     }
 
                     return NullHostedService.Instance;
