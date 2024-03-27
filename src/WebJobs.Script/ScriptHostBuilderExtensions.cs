@@ -6,12 +6,10 @@ using Microsoft.ApplicationInsights.Channel;
 using Microsoft.ApplicationInsights.DataContracts;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.ApplicationInsights.Extensibility.Implementation;
-using Microsoft.ApplicationInsights.WindowsServer.TelemetryChannel;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Azure.WebJobs.Host.Executors;
 using Microsoft.Azure.WebJobs.Hosting;
 using Microsoft.Azure.WebJobs.Logging;
-using Microsoft.Azure.WebJobs.Logging.ApplicationInsights;
 using Microsoft.Azure.WebJobs.Script.Binding;
 using Microsoft.Azure.WebJobs.Script.BindingExtensions;
 using Microsoft.Azure.WebJobs.Script.Config;
@@ -94,8 +92,6 @@ namespace Microsoft.Azure.WebJobs.Script
                 loggingBuilder.Services.AddSingleton<ILoggerProvider, FunctionFileLoggerProvider>();
 
                 loggingBuilder.AddConsoleIfEnabled(context);
-
-                ConfigureTelemetryMode(context, loggingBuilder);
             })
             .ConfigureAppConfiguration((context, configBuilder) =>
             {
@@ -153,24 +149,6 @@ namespace Microsoft.Azure.WebJobs.Script
                     }
                 }
             });
-
-            return builder;
-        }
-
-        private static ILoggingBuilder ConfigureTelemetryMode(HostBuilderContext context, ILoggingBuilder builder)
-        {
-            // Telemetry Mode is located in host.json at the root as "telemetryMode" but is optional
-            var mode = context.Configuration.GetSection(ConfigurationPath.Combine(ConfigurationSectionNames.JobHost, ConfigurationSectionNames.TelemetryMode))?.Get<TelemetryMode>() ?? TelemetryMode.ApplicationInsights;
-
-            if (mode is TelemetryMode.OpenTelemetry)
-            {
-                builder.ConfigureOpenTelemetry();
-            }
-            else if (mode is TelemetryMode.ApplicationInsights)
-            {
-                // Telemetry will only be put out by AppInsights if the env vars for key or connstring are also set, so this is safe to call always.
-                ConfigureApplicationInsights(context, builder);
-            }
 
             return builder;
         }
@@ -324,6 +302,7 @@ namespace Microsoft.Azure.WebJobs.Script
                 services.AddSingleton<IOptions<ScriptApplicationHostOptions>>(new OptionsWrapper<ScriptApplicationHostOptions>(applicationHostOptions));
                 services.AddSingleton<IOptionsMonitor<ScriptApplicationHostOptions>>(new ScriptApplicationHostOptionsMonitor(applicationHostOptions));
                 services.ConfigureOptions<ScriptJobHostOptionsSetup>();
+                services.ConfigureOptions<HostTelemetrySetup>();
                 services.ConfigureOptions<JobHostFunctionTimeoutOptionsSetup>();
                 // LanguageWorkerOptionsSetup should be registered in WebHostServiceCollection as well to enable starting worker processing in placeholder mode.
                 services.ConfigureOptions<LanguageWorkerOptionsSetup>();
@@ -417,45 +396,6 @@ namespace Microsoft.Azure.WebJobs.Script
             });
 
             return builder;
-        }
-
-        internal static void ConfigureApplicationInsights(HostBuilderContext context, ILoggingBuilder builder)
-        {
-            string appInsightsInstrumentationKey = context.Configuration[EnvironmentSettingNames.AppInsightsInstrumentationKey];
-            string appInsightsConnectionString = context.Configuration[EnvironmentSettingNames.AppInsightsConnectionString];
-
-            // Initializing AppInsights services during placeholder mode as well to avoid the cost of JITting these objects during specialization
-            if (!string.IsNullOrEmpty(appInsightsInstrumentationKey) || !string.IsNullOrEmpty(appInsightsConnectionString) || SystemEnvironment.Instance.IsPlaceholderModeEnabled())
-            {
-                builder.AddApplicationInsightsWebJobs(o =>
-                {
-                    o.InstrumentationKey = appInsightsInstrumentationKey;
-                    o.ConnectionString = appInsightsConnectionString;
-                }, t =>
-                {
-                    if (t.TelemetryChannel is ServerTelemetryChannel channel)
-                    {
-                        channel.TransmissionStatusEvent += TransmissionStatusHandler.Handler;
-                    }
-
-                    t.TelemetryProcessorChainBuilder.Use(next => new WorkerTraceFilterTelemetryProcessor(next));
-                    t.TelemetryProcessorChainBuilder.Use(next => new ScriptTelemetryProcessor(next));
-                });
-
-                builder.Services.ConfigureOptions<ApplicationInsightsLoggerOptionsSetup>();
-                builder.Services.AddSingleton<ISdkVersionProvider, FunctionsSdkVersionProvider>();
-                builder.Services.AddSingleton<ITelemetryInitializer, ScriptTelemetryInitializer>();
-
-                if (SystemEnvironment.Instance.IsPlaceholderModeEnabled())
-                {
-                    // Disable auto-http and dependency tracking when in placeholder mode.
-                    builder.Services.Configure<ApplicationInsightsLoggerOptions>(o =>
-                    {
-                        o.HttpAutoCollectionOptions.EnableHttpTriggerExtendedInfoCollection = false;
-                        o.EnableDependencyTracking = false;
-                    });
-                }
-            }
         }
 
         internal static ExtensionBundleOptions GetExtensionBundleOptions(IConfiguration configuration)
