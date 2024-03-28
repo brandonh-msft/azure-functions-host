@@ -157,7 +157,7 @@ namespace Microsoft.Azure.WebJobs.Script
             return builder;
         }
 
-        private static void ConfigureTelemetry(this ILoggingBuilder loggingBuilder, HostBuilderContext context)
+        internal static void ConfigureTelemetry(this ILoggingBuilder loggingBuilder, HostBuilderContext context)
         {
             TelemetryMode mode = TelemetryMode.ApplicationInsights;
 
