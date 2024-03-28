@@ -18,14 +18,14 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Configuration
         {
             using (TempDirectory tempDir = new TempDirectory())
             {
-                string fileName = Path.Combine(tempDir.Path, "settings.txt");
-                IConfiguration configuraton = GetConfiguration(fileName, $"feature1=value1,feature2=value2");
-                FunctionsHostingConfigOptionsSetup setup = new FunctionsHostingConfigOptionsSetup(configuraton);
-                Config.FunctionsHostingConfigOptions options = new Config.FunctionsHostingConfigOptions();
-                setup.Configure(options);
+            string fileName = Path.Combine(tempDir.Path, "settings.txt");
+            IConfiguration configuraton = GetConfiguration(fileName, $"feature1=value1,feature2=value2");
+            FunctionsHostingConfigOptionsSetup setup = new FunctionsHostingConfigOptionsSetup(configuraton);
+            Config.FunctionsHostingConfigOptions options = new Config.FunctionsHostingConfigOptions();
+            setup.Configure(options);
 
-                Assert.Equal(options.GetFeature("feature1"), "value1");
-            }
+            Assert.Equal(options.GetFeature("feature1"), "value1");
+        }
         }
 
         [Fact]
@@ -33,20 +33,20 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Configuration
         {
             using (TempDirectory tempDir = new TempDirectory())
             {
-                string fileName = Path.Combine(tempDir.Path, "settings.txt");
-                IConfiguration configuraton = GetConfiguration(fileName, string.Empty);
-                FunctionsHostingConfigOptionsSetup setup = new FunctionsHostingConfigOptionsSetup(configuraton);
-                Config.FunctionsHostingConfigOptions options = new Config.FunctionsHostingConfigOptions();
-                setup.Configure(options);
+            string fileName = Path.Combine(tempDir.Path, "settings.txt");
+            IConfiguration configuraton = GetConfiguration(fileName, string.Empty);
+            FunctionsHostingConfigOptionsSetup setup = new FunctionsHostingConfigOptionsSetup(configuraton);
+            Config.FunctionsHostingConfigOptions options = new Config.FunctionsHostingConfigOptions();
+            setup.Configure(options);
 
-                Assert.Empty(options.Features);
-            }
+            Assert.Empty(options.Features);
+        }
         }
 
         [Fact]
         public void Configure_DoesNotSet_Options_IfFileDoesNotExist()
         {
-            string fileName = Path.Combine("C://settings.txt");
+            string fileName = Path.Combine("./settings.txt");
             IConfiguration configuraton = GetConfiguration(fileName, string.Empty);
             FunctionsHostingConfigOptionsSetup setup = new FunctionsHostingConfigOptionsSetup(configuraton);
             FunctionsHostingConfigOptions options = new FunctionsHostingConfigOptions();
