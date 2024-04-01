@@ -30,8 +30,15 @@ namespace Microsoft.Azure.WebJobs.Script.Extensions
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("StyleCop.CSharp.NamingRules", "SA1300:Element should begin with upper-case letter", Justification = "local function")]
-        public static void ConfigureOpenTelemetry(this ILoggingBuilder loggingBuilder)
+        public static void ConfigureOpenTelemetry(this ILoggingBuilder loggingBuilder, IConfiguration configuration)
         {
+            var appInsightsConnString = configuration[EnvironmentSettingNames.AppInsightsConnectionString];
+            if (!string.IsNullOrEmpty(appInsightsConnString))
+            {
+                loggingBuilder.Services.Configure<AzureMonitorExporterOptions>(o => o.ConnectionString = appInsightsConnString);
+                loggingBuilder.Services.Configure<LiveMetricsExporterOptions>(o => o.ConnectionString = appInsightsConnString);
+            }
+
             loggingBuilder
                 .AddOpenTelemetry(o =>
                     {
