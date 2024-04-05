@@ -174,7 +174,7 @@ namespace Microsoft.Azure.WebJobs.Script
                     loggingBuilder.ConfigureApplicationInsights(context.Configuration);
                     break;
                 case TelemetryMode.OpenTelemetry:
-                    loggingBuilder.ConfigureOpenTelemetry();
+                    loggingBuilder.ConfigureOpenTelemetry(context.Configuration);
                     break;
             }
         }

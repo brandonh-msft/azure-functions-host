@@ -1,7 +1,7 @@
-using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using FluentAssertions;
 using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.Azure.WebJobs.Script.Configuration;
 using Microsoft.Azure.WebJobs.Script.Diagnostics;
 using Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics;
@@ -97,7 +97,12 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Extensions
             sc.Should().NotBeNullOrEmpty();
             HasOtelServices(sc).Should().BeFalse();
 
-            host.Services.GetService<TelemetryClient>().Should().NotBeNull();
+            var telemetryClient = host.Services.GetService<TelemetryClient>();
+            telemetryClient.Should().NotBeNull();
+
+            var telmetryConfig = host.Services.GetService<TelemetryConfiguration>();
+            telmetryConfig.Should().NotBeNull();
+            telmetryConfig.ConnectionString.Should().Be("some_other_key");
         }
 
         [Fact]
@@ -125,15 +130,10 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Extensions
             HasOtelServices(sc).Should().BeTrue();
 
             host.Services.GetService<TelemetryClient>().Should().BeNull();
+            host.Services.GetService<TelemetryConfiguration>().Should().BeNull();
 
             {
                 var azMonOptions = host.Services.GetService<IOptions<AzureMonitorExporterOptions>>();
-                azMonOptions?.Value?.Should().NotBeNull();
-                azMonOptions.Value.ConnectionString.Should().Be("InstrumentationKey=some_other_key");
-            }
-
-            {
-                var azMonOptions = host.Services.GetService<IOptions<AzureMonitorOptions>>();
                 azMonOptions?.Value?.Should().NotBeNull();
                 azMonOptions.Value.ConnectionString.Should().Be("InstrumentationKey=some_other_key");
             }
@@ -171,12 +171,6 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Extensions
 
             {
                 var azMonOptions = host.Services.GetService<IOptions<AzureMonitorExporterOptions>>();
-                azMonOptions?.Value?.Should().NotBeNull();
-                azMonOptions.Value.ConnectionString.Should().Be("InstrumentationKey=some_other_key");
-            }
-
-            {
-                var azMonOptions = host.Services.GetService<IOptions<AzureMonitorOptions>>();
                 azMonOptions?.Value?.Should().NotBeNull();
                 azMonOptions.Value.ConnectionString.Should().Be("InstrumentationKey=some_other_key");
             }
